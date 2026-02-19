@@ -1,0 +1,50 @@
+import React, {useCallback, useState} from 'react';
+import ConfirmModal from '@components/ConfirmModal';
+import Navigation from '@libs/Navigation/Navigation';
+import {hasAmountOwed} from '@libs/SubscriptionUtils';
+import ROUTES from '@src/ROUTES';
+import useLocalize from './useLocalize';
+
+/**
+ * Hook that encapsulates the outstanding balance guard logic for workspace deletion.
+ * When the user tries to delete their last paid workspace while owing a balance,
+ * a modal is shown directing them to subscription settings to settle the balance.
+ *
+ * @param ownedPaidPoliciesCount - The number of paid policies the current user owns
+ * @returns shouldBlockDeletion - function that checks and shows the modal if needed (returns true if blocked)
+ * @returns OutstandingBalanceModal - React component to render in the page
+ */
+function useOutstandingBalanceGuard(ownedPaidPoliciesCount: number) {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const {translate} = useLocalize();
+
+    const shouldBlockDeletion = useCallback(() => {
+        if (hasAmountOwed() && ownedPaidPoliciesCount === 1) {
+            setIsModalOpen(true);
+            return true;
+        }
+        return false;
+    }, [ownedPaidPoliciesCount]);
+
+    const OutstandingBalanceModal = useCallback(
+        () => (
+            <ConfirmModal
+                title={translate('workspace.common.delete')}
+                isVisible={isModalOpen}
+                onConfirm={() => {
+                    setIsModalOpen(false);
+                    Navigation.navigate(ROUTES.SETTINGS_SUBSCRIPTION.route);
+                }}
+                onCancel={() => setIsModalOpen(false)}
+                prompt={translate('workspace.common.outstandingBalanceWarning')}
+                confirmText={translate('workspace.common.settleBalance')}
+                cancelText={translate('common.cancel')}
+            />
+        ),
+        [isModalOpen, translate],
+    );
+
+    return {shouldBlockDeletion, OutstandingBalanceModal};
+}
+
+export default useOutstandingBalanceGuard;

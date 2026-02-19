@@ -29,6 +29,7 @@ import {useMemoizedLazyExpensifyIcons} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
 import useNetwork from '@hooks/useNetwork';
 import useOnyx from '@hooks/useOnyx';
+import useOutstandingBalanceGuard from '@hooks/useOutstandingBalanceGuard';
 import usePayAndDowngrade from '@hooks/usePayAndDowngrade';
 import usePoliciesWithCardFeedErrors from '@hooks/usePoliciesWithCardFeedErrors';
 import usePreferredPolicy from '@hooks/usePreferredPolicy';
@@ -66,7 +67,7 @@ import {
 } from '@libs/PolicyUtils';
 import {getDefaultWorkspaceAvatar} from '@libs/ReportUtils';
 import shouldRenderTransferOwnerButton from '@libs/shouldRenderTransferOwnerButton';
-import {hasAmountOwed, isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot as shouldCalculateBillNewDotFn} from '@libs/SubscriptionUtils';
+import {isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot as shouldCalculateBillNewDotFn} from '@libs/SubscriptionUtils';
 import type {AvatarSource} from '@libs/UserAvatarUtils';
 import {setNameValuePair} from '@userActions/User';
 import CONST from '@src/CONST';
@@ -190,9 +191,11 @@ function WorkspacesListPage() {
     // This hook preloads the screens of adjacent tabs to make changing tabs faster.
     usePreloadFullScreenNavigators();
 
+    const ownedPaidPoliciesCount = getOwnedPaidPolicies(policies, currentUserPersonalDetails?.accountID).length;
+    const {shouldBlockDeletion, OutstandingBalanceModal} = useOutstandingBalanceGuard(ownedPaidPoliciesCount);
+
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleteWorkspaceErrorModalOpen, setIsDeleteWorkspaceErrorModalOpen] = useState(false);
-    const [isOutstandingBalanceModalOpen, setIsOutstandingBalanceModalOpen] = useState(false);
     const [policyIDToDelete, setPolicyIDToDelete] = useState<string>();
     // The workspace was deleted in this page
     const [policyNameToDelete, setPolicyNameToDelete] = useState<string>();
@@ -452,8 +455,7 @@ function WorkspacesListPage() {
                         setPolicyIDToDelete(item.policyID);
                         setPolicyNameToDelete(item.title);
 
-                        if (hasAmountOwed() && getOwnedPaidPolicies(policies, currentUserPersonalDetails?.accountID).length === 1) {
-                            setIsOutstandingBalanceModalOpen(true);
+                        if (shouldBlockDeletion()) {
                             return;
                         }
 
@@ -560,6 +562,7 @@ function WorkspacesListPage() {
             privateSubscription?.type,
             currentUserPersonalDetails?.accountID,
             personalDetails,
+            shouldBlockDeletion,
         ],
     );
 
@@ -909,18 +912,7 @@ function WorkspacesListPage() {
                 shouldShowCancelButton={false}
                 success={false}
             />
-            <ConfirmModal
-                title={translate('workspace.common.delete')}
-                isVisible={isOutstandingBalanceModalOpen}
-                onConfirm={() => {
-                    setIsOutstandingBalanceModalOpen(false);
-                    Navigation.navigate(ROUTES.SETTINGS_SUBSCRIPTION.route);
-                }}
-                onCancel={() => setIsOutstandingBalanceModalOpen(false)}
-                prompt={translate('workspace.common.outstandingBalanceWarning')}
-                confirmText={translate('workspace.common.settleBalance')}
-                cancelText={translate('common.cancel')}
-            />
+            <OutstandingBalanceModal />
             {shouldDisplayLHB && <NavigationTabBar selectedTab={NAVIGATION_TABS.WORKSPACES} />}
         </ScreenWrapper>
     );

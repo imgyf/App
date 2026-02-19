@@ -21,6 +21,7 @@ import {useMemoizedLazyExpensifyIcons, useMemoizedLazyIllustrations} from '@hook
 import useLocalize from '@hooks/useLocalize';
 import useNetwork from '@hooks/useNetwork';
 import useOnyx from '@hooks/useOnyx';
+import useOutstandingBalanceGuard from '@hooks/useOutstandingBalanceGuard';
 import usePayAndDowngrade from '@hooks/usePayAndDowngrade';
 import usePermissions from '@hooks/usePermissions';
 import usePrevious from '@hooks/usePrevious';
@@ -60,7 +61,7 @@ import {
 import {getDefaultWorkspaceAvatar} from '@libs/ReportUtils';
 import shouldRenderTransferOwnerButton from '@libs/shouldRenderTransferOwnerButton';
 import StringUtils from '@libs/StringUtils';
-import {hasAmountOwed, isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot} from '@libs/SubscriptionUtils';
+import {isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot} from '@libs/SubscriptionUtils';
 import CONST from '@src/CONST';
 import ONYXKEYS from '@src/ONYXKEYS';
 import ROUTES from '@src/ROUTES';
@@ -189,12 +190,12 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
         canBeMissing: true,
     });
     const ownerPolicies = ownerPoliciesSelector(policies, accountID);
+    const {shouldBlockDeletion, OutstandingBalanceModal} = useOutstandingBalanceGuard(ownerPolicies.length);
 
     const isFocused = useIsFocused();
     const isPendingDelete = isPendingDeletePolicy(policy);
     const prevIsPendingDelete = usePrevious(isPendingDelete);
     const [isDeleteWorkspaceErrorModalOpen, setIsDeleteWorkspaceErrorModalOpen] = useState(false);
-    const [isOutstandingBalanceModalOpen, setIsOutstandingBalanceModalOpen] = useState(false);
     const policyLastErrorMessage = getLatestErrorMessage(policy);
 
     const fetchPolicyData = useCallback(() => {
@@ -336,8 +337,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
             return;
         }
 
-        if (hasAmountOwed() && ownerPolicies.length === 1) {
-            setIsOutstandingBalanceModalOpen(true);
+        if (shouldBlockDeletion()) {
             return;
         }
 
@@ -348,7 +348,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
         }
 
         continueDeleteWorkspace();
-    }, [continueDeleteWorkspace, setIsDeletingPaidWorkspace, canDowngrade, policyID, subscriptionType, ownerPolicies]);
+    }, [continueDeleteWorkspace, setIsDeletingPaidWorkspace, canDowngrade, policyID, subscriptionType, ownerPolicies, shouldBlockDeletion]);
 
     const handleBackButtonPress = () => {
         if (isComingFromGlobalReimbursementsFlow) {
@@ -570,18 +570,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
                 shouldShowCancelButton={false}
                 success={false}
             />
-            <ConfirmModal
-                title={translate('workspace.common.delete')}
-                isVisible={isOutstandingBalanceModalOpen}
-                onConfirm={() => {
-                    setIsOutstandingBalanceModalOpen(false);
-                    Navigation.navigate(ROUTES.SETTINGS_SUBSCRIPTION.route);
-                }}
-                onCancel={() => setIsOutstandingBalanceModalOpen(false)}
-                prompt={translate('workspace.common.outstandingBalanceWarning')}
-                confirmText={translate('workspace.common.settleBalance')}
-                cancelText={translate('common.cancel')}
-            />
+            <OutstandingBalanceModal />
         </>
     );
     return (
