@@ -53,6 +53,7 @@ import type {PlatformStackRouteProp} from '@libs/Navigation/PlatformStackNavigat
 import type {AuthScreensParamList} from '@libs/Navigation/types';
 import {
     getConnectionExporters,
+    getOwnedPaidPolicies,
     getPolicyBrickRoadIndicatorStatus,
     getUberConnectionErrorDirectlyFromPolicy,
     getUserFriendlyWorkspaceType,
@@ -65,7 +66,7 @@ import {
 } from '@libs/PolicyUtils';
 import {getDefaultWorkspaceAvatar} from '@libs/ReportUtils';
 import shouldRenderTransferOwnerButton from '@libs/shouldRenderTransferOwnerButton';
-import {isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot as shouldCalculateBillNewDotFn} from '@libs/SubscriptionUtils';
+import {hasAmountOwed, isSubscriptionTypeOfInvoicing, shouldCalculateBillNewDot as shouldCalculateBillNewDotFn} from '@libs/SubscriptionUtils';
 import type {AvatarSource} from '@libs/UserAvatarUtils';
 import {setNameValuePair} from '@userActions/User';
 import CONST from '@src/CONST';
@@ -94,7 +95,12 @@ type WorkspaceItem = {listItemType: 'workspace'} & ListItem &
         isJoinRequestPending?: boolean;
     };
 
-type WorkspaceOrDomainListItem = WorkspaceItem | DomainItem | {listItemType: 'domains-header' | 'workspaces-empty-state' | 'domains-empty-state'};
+type WorkspaceOrDomainListItem =
+    | WorkspaceItem
+    | DomainItem
+    | {
+          listItemType: 'domains-header' | 'workspaces-empty-state' | 'domains-empty-state';
+      };
 
 type GetWorkspaceMenuItem = {item: WorkspaceItem; index: number};
 
@@ -138,31 +144,55 @@ function WorkspacesListPage() {
     const privateSubscription = usePrivateSubscription();
     const currentUserPersonalDetails = useCurrentUserPersonalDetails();
     const [allConnectionSyncProgresses] = useOnyx(ONYXKEYS.COLLECTION.POLICY_CONNECTION_SYNC_PROGRESS, {canBeMissing: true});
-    const [policies] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {canBeMissing: true});
-    const [reimbursementAccount] = useOnyx(ONYXKEYS.REIMBURSEMENT_ACCOUNT, {canBeMissing: true});
+    const [policies] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {
+        canBeMissing: true,
+    });
+    const [reimbursementAccount] = useOnyx(ONYXKEYS.REIMBURSEMENT_ACCOUNT, {
+        canBeMissing: true,
+    });
     const [session] = useOnyx(ONYXKEYS.SESSION, {canBeMissing: true});
-    const [activePolicyID] = useOnyx(ONYXKEYS.NVP_ACTIVE_POLICY_ID, {canBeMissing: true});
-    const [isLoadingApp] = useOnyx(ONYXKEYS.IS_LOADING_APP, {canBeMissing: true});
-    const [lastPaymentMethod] = useOnyx(ONYXKEYS.NVP_LAST_PAYMENT_METHOD, {canBeMissing: true});
+    const [activePolicyID] = useOnyx(ONYXKEYS.NVP_ACTIVE_POLICY_ID, {
+        canBeMissing: true,
+    });
+    const [isLoadingApp] = useOnyx(ONYXKEYS.IS_LOADING_APP, {
+        canBeMissing: true,
+    });
+    const [lastPaymentMethod] = useOnyx(ONYXKEYS.NVP_LAST_PAYMENT_METHOD, {
+        canBeMissing: true,
+    });
     const shouldShowLoadingIndicator = isLoadingApp && !isOffline;
     const route = useRoute<PlatformStackRouteProp<AuthScreensParamList, typeof SCREENS.WORKSPACES_LIST>>();
     const [fundList] = useOnyx(ONYXKEYS.FUND_LIST, {canBeMissing: true});
-    const [duplicateWorkspace] = useOnyx(ONYXKEYS.DUPLICATE_WORKSPACE, {canBeMissing: true});
+    const [duplicateWorkspace] = useOnyx(ONYXKEYS.DUPLICATE_WORKSPACE, {
+        canBeMissing: true,
+    });
     const {isRestrictedToPreferredPolicy, preferredPolicyID, isRestrictedPolicyCreation} = usePreferredPolicy();
     const [account] = useOnyx(ONYXKEYS.ACCOUNT, {canBeMissing: true});
-    const [bankAccountList] = useOnyx(ONYXKEYS.BANK_ACCOUNT_LIST, {canBeMissing: true});
-    const [reimbursementAccountError] = useOnyx(ONYXKEYS.REIMBURSEMENT_ACCOUNT, {canBeMissing: true, selector: reimbursementAccountErrorSelector});
+    const [bankAccountList] = useOnyx(ONYXKEYS.BANK_ACCOUNT_LIST, {
+        canBeMissing: true,
+    });
+    const [reimbursementAccountError] = useOnyx(ONYXKEYS.REIMBURSEMENT_ACCOUNT, {
+        canBeMissing: true,
+        selector: reimbursementAccountErrorSelector,
+    });
 
-    const [allDomains] = useOnyx(ONYXKEYS.COLLECTION.DOMAIN, {canBeMissing: false});
-    const [allDomainErrors] = useOnyx(ONYXKEYS.COLLECTION.DOMAIN_ERRORS, {canBeMissing: true});
+    const [allDomains] = useOnyx(ONYXKEYS.COLLECTION.DOMAIN, {
+        canBeMissing: false,
+    });
+    const [allDomainErrors] = useOnyx(ONYXKEYS.COLLECTION.DOMAIN_ERRORS, {
+        canBeMissing: true,
+    });
     const [adminAccess] = useOnyx(ONYXKEYS.COLLECTION.SHARED_NVP_PRIVATE_ADMIN_ACCESS, {canBeMissing: false});
-    const [personalPolicyID] = useOnyx(ONYXKEYS.PERSONAL_POLICY_ID, {canBeMissing: true});
+    const [personalPolicyID] = useOnyx(ONYXKEYS.PERSONAL_POLICY_ID, {
+        canBeMissing: true,
+    });
 
     // This hook preloads the screens of adjacent tabs to make changing tabs faster.
     usePreloadFullScreenNavigators();
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleteWorkspaceErrorModalOpen, setIsDeleteWorkspaceErrorModalOpen] = useState(false);
+    const [isOutstandingBalanceModalOpen, setIsOutstandingBalanceModalOpen] = useState(false);
     const [policyIDToDelete, setPolicyIDToDelete] = useState<string>();
     // The workspace was deleted in this page
     const [policyNameToDelete, setPolicyNameToDelete] = useState<string>();
@@ -170,8 +200,13 @@ function WorkspacesListPage() {
         setIsDeleteModalOpen(true);
     }, []);
     const {reportsToArchive, transactionViolations} = useTransactionViolationOfWorkspace(policyIDToDelete);
-    const {setIsDeletingPaidWorkspace, isLoadingBill}: {setIsDeletingPaidWorkspace: (value: boolean) => void; isLoadingBill: boolean | undefined} =
-        usePayAndDowngrade(continueDeleteWorkspace);
+    const {
+        setIsDeletingPaidWorkspace,
+        isLoadingBill,
+    }: {
+        setIsDeletingPaidWorkspace: (value: boolean) => void;
+        isLoadingBill: boolean | undefined;
+    } = usePayAndDowngrade(continueDeleteWorkspace);
 
     const [loadingSpinnerIconIndex, setLoadingSpinnerIconIndex] = useState<number | null>(null);
 
@@ -416,6 +451,11 @@ function WorkspacesListPage() {
 
                         setPolicyIDToDelete(item.policyID);
                         setPolicyNameToDelete(item.title);
+
+                        if (hasAmountOwed() && getOwnedPaidPolicies(policies, currentUserPersonalDetails?.accountID).length === 1) {
+                            setIsOutstandingBalanceModalOpen(true);
+                            return;
+                        }
 
                         if (shouldCalculateBillNewDot) {
                             setIsDeletingPaidWorkspace(true);
@@ -672,7 +712,10 @@ function WorkspacesListPage() {
         }
         const duplicateWorkspaceIndex = filteredWorkspaces.findIndex((workspace) => workspace.policyID === duplicatedWSPolicyID);
         if (duplicateWorkspaceIndex >= 0) {
-            flatlistRef.current?.scrollToIndex({index: duplicateWorkspaceIndex, animated: false});
+            flatlistRef.current?.scrollToIndex({
+                index: duplicateWorkspaceIndex,
+                animated: false,
+            });
             // eslint-disable-next-line @typescript-eslint/no-deprecated
             InteractionManager.runAfterInteractions(() => {
                 clearDuplicateWorkspace();
@@ -865,6 +908,18 @@ function WorkspacesListPage() {
                 confirmText={translate('common.buttonConfirm')}
                 shouldShowCancelButton={false}
                 success={false}
+            />
+            <ConfirmModal
+                title={translate('workspace.common.delete')}
+                isVisible={isOutstandingBalanceModalOpen}
+                onConfirm={() => {
+                    setIsOutstandingBalanceModalOpen(false);
+                    Navigation.navigate(ROUTES.SETTINGS_SUBSCRIPTION.route);
+                }}
+                onCancel={() => setIsOutstandingBalanceModalOpen(false)}
+                prompt={translate('workspace.common.outstandingBalanceWarning')}
+                confirmText={translate('workspace.common.settleBalance')}
+                cancelText={translate('common.cancel')}
             />
             {shouldDisplayLHB && <NavigationTabBar selectedTab={NAVIGATION_TABS.WORKSPACES} />}
         </ScreenWrapper>

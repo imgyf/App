@@ -3873,6 +3873,9 @@ ${
             defaultNote: `Belege, die an ${CONST.EMAIL.RECEIPTS} gesendet werden, erscheinen in diesem Workspace.`,
             deleteConfirmation: 'Möchten Sie diesen Workspace wirklich löschen?',
             deleteWithCardsConfirmation: 'Möchtest du diesen Workspace wirklich löschen? Dadurch werden alle Kartenfeeds und zugewiesenen Karten entfernt.',
+            outstandingBalanceWarning:
+                'Du hast einen offenen Betrag, der beglichen werden muss, bevor du deinen letzten Workspace löschen kannst. Bitte gehe zu deinen Abonnementeinstellungen, um die Zahlung zu klären.',
+            settleBalance: 'Zum Abonnement',
             unavailable: 'Nicht verfügbiger Arbeitsbereich',
             memberNotFound: 'Mitglied nicht gefunden. Um ein neues Mitglied zum Arbeitsbereich einzuladen, verwende bitte die Einladungsschaltfläche oben.',
             notAuthorized: `Du hast keinen Zugriff auf diese Seite. Wenn du versuchst, diesem Arbeitsbereich beizutreten, bitte einfach die/den Arbeitsbereichsinhaber·in, dich als Mitglied hinzuzufügen. Etwas anderes? Wende dich an ${CONST.EMAIL.CONCIERGE}.`,
