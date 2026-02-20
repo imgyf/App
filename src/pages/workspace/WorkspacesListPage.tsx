@@ -164,7 +164,7 @@ function WorkspacesListPage() {
     usePreloadFullScreenNavigators();
 
     const ownedPaidPolicies = ownerPoliciesSelector(policies, currentUserPersonalDetails?.accountID);
-    const {shouldBlockDeletion, OutstandingBalanceModal} = useOutstandingBalanceGuard(ownedPaidPolicies.length);
+    const {shouldBlockDeletion, wouldBlockDeletion, outstandingBalanceModal} = useOutstandingBalanceGuard(ownedPaidPolicies.length);
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleteWorkspaceErrorModalOpen, setIsDeleteWorkspaceErrorModalOpen] = useState(false);
@@ -435,8 +435,8 @@ function WorkspacesListPage() {
 
                         continueDeleteWorkspace();
                     },
-                    shouldKeepModalOpen: shouldCalculateBillNewDot,
-                    shouldCallAfterModalHide: !shouldCalculateBillNewDot,
+                    shouldKeepModalOpen: shouldCalculateBillNewDot && !wouldBlockDeletion,
+                    shouldCallAfterModalHide: !shouldCalculateBillNewDot || wouldBlockDeletion,
                 });
             }
 
@@ -530,6 +530,7 @@ function WorkspacesListPage() {
             currentUserPersonalDetails?.accountID,
             personalDetails,
             shouldBlockDeletion,
+            wouldBlockDeletion,
         ],
     );
 
@@ -876,7 +877,7 @@ function WorkspacesListPage() {
                 shouldShowCancelButton={false}
                 success={false}
             />
-            <OutstandingBalanceModal />
+            {outstandingBalanceModal}
             {shouldDisplayLHB && <NavigationTabBar selectedTab={NAVIGATION_TABS.WORKSPACES} />}
         </ScreenWrapper>
     );

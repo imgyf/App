@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import ConfirmModal from '@components/ConfirmModal';
 import Navigation from '@libs/Navigation/Navigation';
 import {hasAmountOwed} from '@libs/SubscriptionUtils';
@@ -12,21 +12,24 @@ import useLocalize from './useLocalize';
  *
  * @param ownedPaidPoliciesCount - The number of paid policies the current user owns
  * @returns shouldBlockDeletion - function that checks and shows the modal if needed (returns true if blocked)
- * @returns OutstandingBalanceModal - React component to render in the page
+ * @returns wouldBlockDeletion - pre-computed boolean for popover/menu configuration
+ * @returns outstandingBalanceModal - React element to render in the page
  */
 function useOutstandingBalanceGuard(ownedPaidPoliciesCount: number) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const {translate} = useLocalize();
 
+    const wouldBlockDeletion = hasAmountOwed() && ownedPaidPoliciesCount === 1;
+
     const shouldBlockDeletion = useCallback(() => {
-        if (hasAmountOwed() && ownedPaidPoliciesCount === 1) {
+        if (wouldBlockDeletion) {
             setIsModalOpen(true);
             return true;
         }
         return false;
-    }, [ownedPaidPoliciesCount]);
+    }, [wouldBlockDeletion]);
 
-    const OutstandingBalanceModal = useCallback(
+    const outstandingBalanceModal = useMemo(
         () => (
             <ConfirmModal
                 title={translate('workspace.common.delete')}
@@ -44,7 +47,7 @@ function useOutstandingBalanceGuard(ownedPaidPoliciesCount: number) {
         [isModalOpen, translate],
     );
 
-    return {shouldBlockDeletion, OutstandingBalanceModal};
+    return {shouldBlockDeletion, wouldBlockDeletion, outstandingBalanceModal};
 }
 
 export default useOutstandingBalanceGuard;

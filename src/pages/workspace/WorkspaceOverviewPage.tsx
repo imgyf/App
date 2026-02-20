@@ -179,7 +179,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
 
     const [policies] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {canBeMissing: true});
     const ownerPolicies = ownerPoliciesSelector(policies, accountID);
-    const {shouldBlockDeletion, OutstandingBalanceModal} = useOutstandingBalanceGuard(ownerPolicies.length);
+    const {shouldBlockDeletion, wouldBlockDeletion, outstandingBalanceModal} = useOutstandingBalanceGuard(ownerPolicies.length);
 
     const isFocused = useIsFocused();
     const isPendingDelete = isPendingDeletePolicy(policy);
@@ -465,7 +465,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
                 onSelected: onDeleteWorkspace,
                 disabled: isLoadingBill,
                 shouldShowLoadingSpinnerIcon: isLoadingBill,
-                shouldCloseModalOnSelect: !shouldCalculateBillNewDot(account?.canDowngrade),
+                shouldCloseModalOnSelect: !shouldCalculateBillNewDot(account?.canDowngrade) || wouldBlockDeletion,
             });
         }
         const isCurrentUserAdmin = policy?.employeeList?.[currentUserPersonalDetails?.login ?? '']?.role === CONST.POLICY.ROLE.ADMIN;
@@ -550,7 +550,7 @@ function WorkspaceOverviewPage({policyDraft, policy: policyProp, route}: Workspa
                 shouldShowCancelButton={false}
                 success={false}
             />
-            <OutstandingBalanceModal />
+            {outstandingBalanceModal}
         </>
     );
     return (
