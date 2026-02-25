@@ -778,7 +778,9 @@ function isPaidGroupPolicy(policy: OnyxInputOrEntry<Policy>): boolean {
 }
 
 function getOwnedPaidPolicies(policies: OnyxCollection<Policy> | null, currentUserAccountID: number | undefined): Policy[] {
-    return Object.values(policies ?? {}).filter((policy): policy is Policy => isPolicyOwner(policy, currentUserAccountID ?? CONST.DEFAULT_NUMBER_ID) && isPaidGroupPolicy(policy));
+    return Object.values(policies ?? {}).filter(
+        (policy): policy is Policy => isPolicyOwner(policy, currentUserAccountID ?? CONST.DEFAULT_NUMBER_ID) && isPaidGroupPolicy(policy) && !isPendingDeletePolicy(policy),
+    );
 }
 
 function isControlPolicy(policy: OnyxEntry<Policy>): boolean {
